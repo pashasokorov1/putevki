@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: fleet-fuel-api
+    runtime: node
+    rootDir: .
+    buildCommand: npm install && npm run build:api
+    startCommand: npm run start --workspace @fleet/api
+    envVars:
+      - key: API_PORT
+        value: 3010
+      - key: CORS_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
