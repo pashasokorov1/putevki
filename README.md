@@ -56,7 +56,17 @@ MVP-платформа для водителей и диспетчеров с п
 - env:
   - `VITE_API_URL=https://<your-api-domain>`
 
-### 3. Backend На Render
+### 3. Backend На Railway (Бесплатный Вариант)
+
+- создать проект в Railway из GitHub-репозитория
+- Railway подхватит [railway.json](/Users/pasha/Documents/New%20project/railway.json)
+- env:
+  - `API_PORT=3010`
+  - `CORS_ORIGIN=https://<your-vercel-domain>`
+  - `SUPABASE_URL=...`
+  - `SUPABASE_SERVICE_ROLE_KEY=...`
+
+### 4. Backend На Render (Альтернатива)
 
 - создать Web Service из GitHub-репозитория
 - Render может использовать [render.yaml](/Users/pasha/Documents/New%20project/render.yaml)
@@ -66,7 +76,7 @@ MVP-платформа для водителей и диспетчеров с п
   - `SUPABASE_URL=...`
   - `SUPABASE_SERVICE_ROLE_KEY=...`
 
-### 4. БД На Supabase
+### 5. БД На Supabase
 
 - создать проект в Supabase
 - получить:
