@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { loadRemoteAppState, saveRemoteAppState } from "./appStateApi";
 import {
   calculateFuelSheet,
   dashboardStats,
@@ -88,6 +89,7 @@ const routePresets = [
 
 const STORAGE_KEYS = {
   session: "fleet.session",
+  drivers: "fleet.drivers",
   vehicles: "fleet.vehicles",
   fuelSheets: "fleet.fuelSheets",
   sheetInput: "fleet.sheetInput"
@@ -168,8 +170,10 @@ export function App() {
   const [session, setSession] = useState<Session | null>(() => readStorage(STORAGE_KEYS.session, null));
   const [activeView, setActiveView] = useState<ViewId>("new-sheet");
   const [vehicles, setVehicles] = useState<Vehicle[]>(() => readStorage(STORAGE_KEYS.vehicles, initialVehicles));
-  const [drivers] = useState<Driver[]>(initialDrivers);
-  const [fuelSheets, setFuelSheets] = useState<FuelSheetRecord[]>(() => readStorage(STORAGE_KEYS.fuelSheets, initialFuelSheets));
+  const [drivers, setDrivers] = useState<Driver[]>(() => readStorage(STORAGE_KEYS.drivers, initialDrivers));
+  const [fuelSheets, setFuelSheets] = useState<FuelSheetRecord[]>(() =>
+    readStorage(STORAGE_KEYS.fuelSheets, initialFuelSheets)
+  );
   const [sheetInput, setSheetInput] = useState<FuelSheetInput>(() => readStorage(STORAGE_KEYS.sheetInput, initialInput));
   const [filters, setFilters] = useState<SearchFilters>({
     search: "",
@@ -181,9 +185,11 @@ export function App() {
   const [savedVehicleId, setSavedVehicleId] = useState<string | null>(null);
   const [editingSheetId, setEditingSheetId] = useState<string | null>(null);
   const [editingSheetInput, setEditingSheetInput] = useState<FuelSheetInput | null>(null);
+  const [cloudStatus, setCloudStatus] = useState<"loading" | "synced" | "local" | "error">("loading");
+  const [isCloudHydrated, setIsCloudHydrated] = useState(false);
 
-  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === sheetInput.vehicleId) ?? vehicles[0];
-  const selectedDriver = drivers.find((driver) => driver.id === sheetInput.driverId) ?? drivers[0];
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === sheetInput.vehicleId) ?? vehicles[0] ?? initialVehicles[0];
+  const selectedDriver = drivers.find((driver) => driver.id === sheetInput.driverId) ?? drivers[0] ?? initialDrivers[0];
   const odometerStart = selectedVehicle.currentOdometer ?? 0;
   const preparedInput = useMemo(() => normalizeFuelSheetInput(sheetInput, odometerStart), [sheetInput, odometerStart]);
   const calculation = calculateFuelSheet(preparedInput, selectedVehicle);
@@ -243,6 +249,12 @@ export function App() {
 
   useEffect(() => {
     if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEYS.drivers, JSON.stringify(drivers));
+    }
+  }, [drivers]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEYS.vehicles, JSON.stringify(vehicles));
     }
   }, [vehicles]);
@@ -258,6 +270,78 @@ export function App() {
       window.localStorage.setItem(STORAGE_KEYS.sheetInput, JSON.stringify(sheetInput));
     }
   }, [sheetInput]);
+
+  useEffect(() => {
+    let isActive = true;
+
+    async function hydrateCloudState() {
+      try {
+        const result = await loadRemoteAppState();
+        if (!isActive) {
+          return;
+        }
+
+        if (result?.payload) {
+          setVehicles(result.payload.vehicles.length > 0 ? result.payload.vehicles : initialVehicles);
+          setDrivers(result.payload.drivers.length > 0 ? result.payload.drivers : initialDrivers);
+          setFuelSheets(result.payload.fuelSheets ?? []);
+          setCloudStatus(result.mode === "remote" ? "synced" : "local");
+        } else {
+          setCloudStatus("local");
+        }
+      } catch {
+        if (isActive) {
+          setCloudStatus("local");
+        }
+      } finally {
+        if (isActive) {
+          setIsCloudHydrated(true);
+        }
+      }
+    }
+
+    void hydrateCloudState();
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!vehicles.some((vehicle) => vehicle.id === sheetInput.vehicleId) && vehicles[0]) {
+      setSheetInput((current) => ({ ...current, vehicleId: vehicles[0].id }));
+    }
+  }, [vehicles, sheetInput.vehicleId]);
+
+  useEffect(() => {
+    if (!drivers.some((driver) => driver.id === sheetInput.driverId) && drivers[0]) {
+      setSheetInput((current) => ({ ...current, driverId: drivers[0].id }));
+    }
+  }, [drivers, sheetInput.driverId]);
+
+  useEffect(() => {
+    if (!fuelSheets.some((sheet) => sheet.id === selectedSheetId)) {
+      setSelectedSheetId(fuelSheets[0]?.id ?? "");
+    }
+  }, [fuelSheets, selectedSheetId]);
+
+  useEffect(() => {
+    if (!isCloudHydrated || typeof window === "undefined") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void saveRemoteAppState({ vehicles, drivers, fuelSheets })
+        .then((result) => {
+          setCloudStatus(result?.mode === "remote" ? "synced" : "local");
+        })
+        .catch(() => {
+          setCloudStatus("error");
+        });
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+  }, [drivers, fuelSheets, isCloudHydrated, vehicles]);
 
   function updateInput<K extends keyof FuelSheetInput>(key: K, value: FuelSheetInput[K]) {
     setSheetInput((current) => ({ ...current, [key]: value }));
@@ -579,6 +663,15 @@ export function App() {
             <h2>Быстрый и понятный расчет путевки</h2>
           </div>
           <div className="topbar-actions">
+            <span className={`cloud-pill ${cloudStatus}`}>
+              {cloudStatus === "loading"
+                ? "Подключаем облако"
+                : cloudStatus === "synced"
+                  ? "Общее облако подключено"
+                  : cloudStatus === "error"
+                    ? "Ошибка синхронизации"
+                    : "Локальный режим"}
+            </span>
             <button type="button" className="secondary-button" onClick={() => setActiveView("journal")}>
               Смотреть журнал
             </button>

@@ -48,25 +48,23 @@ MVP-платформа для водителей и диспетчеров с п
   - `git remote add origin <your-repo-url>`
   - `git push -u origin main`
 
-### 2. Frontend На Vercel
+### 2. Frontend И API На Vercel
 
 - импортировать репозиторий из GitHub в Vercel
 - root directory: корень репозитория
 - Vercel уже может использовать [vercel.json](/Users/pasha/Documents/New%20project/vercel.json)
-- env:
-  - `VITE_API_URL=https://<your-api-domain>`
-
-### 3. Backend На Railway (Бесплатный Вариант)
-
-- создать проект в Railway из GitHub-репозитория
-- Railway подхватит [railway.json](/Users/pasha/Documents/New%20project/railway.json)
-- env:
-  - `API_PORT=3010`
-  - `CORS_ORIGIN=https://<your-vercel-domain>`
+- API-функции лежат в `api/` и деплоятся вместе с фронтендом
+- env в Vercel:
   - `SUPABASE_URL=...`
   - `SUPABASE_SERVICE_ROLE_KEY=...`
+- `VITE_API_URL` не нужен, если фронтенд и API живут в одном Vercel-проекте
 
-### 4. Backend На Render (Альтернатива)
+### 3. Таблица Состояния В Supabase
+
+- выполнить SQL из [001_app_state.sql](/Users/pasha/Documents/New%20project/supabase/001_app_state.sql)
+- Vercel Functions будут читать и сохранять общее состояние в таблицу `app_state`
+
+### 4. Backend На Railway Или Render (Необязательно)
 
 - создать Web Service из GitHub-репозитория
 - Render может использовать [render.yaml](/Users/pasha/Documents/New%20project/render.yaml)
@@ -83,11 +81,12 @@ MVP-платформа для водителей и диспетчеров с п
   - `SUPABASE_URL`
   - `SUPABASE_ANON_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
-- на текущем шаге проект уже подготовлен под env-переменные, а следующим этапом нужно подключить реальные таблицы и API-операции вместо browser storage
+- на текущем шаге проект уже умеет хранить общее состояние через Vercel Functions + Supabase
 
 ## Что Уже Подготовлено Под Онлайн
 
 - [vercel.json](/Users/pasha/Documents/New%20project/vercel.json) для frontend
+- `api/` с Vercel Functions для общего cloud storage
 - [render.yaml](/Users/pasha/Documents/New%20project/render.yaml) для backend
 - [.env.example](/Users/pasha/Documents/New%20project/.env.example) и env-шаблоны в `apps/web` и `apps/api`
 - backend читает `API_PORT` и `CORS_ORIGIN`
